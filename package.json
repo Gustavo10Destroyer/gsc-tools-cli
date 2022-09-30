@@ -1,0 +1,23 @@
+{
+  "name": "gsc",
+  "version": "1.0.0",
+  "description": "",
+  "pkg": {
+    "assets": [
+      "compiler.rar",
+      "node_modules\\node-unrar-js\\dist\\js\\unrar.wasm"
+    ],
+    "output": "dist"
+  },
+  "main": "index.js",
+  "bin": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "NoobCursed",
+  "license": "MIT",
+  "dependencies": {
+    "argparse": "^2.0.1",
+    "node-unrar-js": "^2.0.0"
+  }
+}
