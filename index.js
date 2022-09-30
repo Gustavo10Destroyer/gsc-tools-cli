@@ -58,7 +58,7 @@ const INITIAL_HEADERS = [
 
 parser.add_argument("-v", "--version", {
     action: "version",
-    version
+    version: `GSC Tools CLI - v${version}`
 });
 
 parser.add_argument("command", {
@@ -251,4 +251,9 @@ switch(args.command) {
                 });
             });
         });
+    
+        break;
+    default:
+        console.log("Comando inválido. Use 'gsc --help' para ver a lista de comandos.");
+        process.exit(1);
 }
