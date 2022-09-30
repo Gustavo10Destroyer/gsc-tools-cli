@@ -254,6 +254,26 @@ switch(args.command) {
         });
     
         break;
+    case "watch":
+    case "observar":
+        if(!fs.existsSync("gsc.json")) {
+            console.log("Não foi possível encontrar o arquivo de descrição do projeto.");
+            process.exit(1);
+        }
+
+        let lastBuild = 0;
+
+        fs.watch("./src", (event, filename) => {
+            if(filename.endsWith(".gsc")) {
+                if(Date.now() - lastBuild < 1000) return;
+                lastBuild = Date.now();
+
+                console.log("Arquivo modificado, recompilando...");
+                child_process.exec("gsc build");
+            }
+        });
+
+        break;
     default:
         console.log("Comando inválido. Use 'gsc --help' para ver a lista de comandos.");
         process.exit(1);
