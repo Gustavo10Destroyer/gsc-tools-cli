@@ -4,6 +4,7 @@ const { ArgumentParser } = require("argparse");
 const { version } = require("./package.json");
 const child_process = require("child_process");
 const { createExtractorFromFile } = require("node-unrar-js");
+const chokidar = require("chokidar");
 
 // Extract File function
 const extractRARFile = async (file, destination) => {
@@ -17,6 +18,121 @@ const extractRARFile = async (file, destination) => {
     } catch (err) {
         console.error(err);
     }
+};
+
+const compile = (canExit) => {
+    if(!fs.existsSync(path.join(process.cwd(), "gsc.json"))) {
+        console.log("Não foi possível encontrar o arquivo de descrição do projeto.");
+        process.exit(1);
+    }
+
+    fs.readFile(path.join(process.cwd(), "gsc.json"), (err, data) => {
+        try {
+            data = JSON.parse(data);
+        } catch(e) {
+            console.log("O arquivo de descrição do projeto está corrompido.");
+            console.error(e);
+            process.exit(1);
+        }
+
+        if(!data.name) {
+            console.log("O arquivo de descrição do projeto está corrompido.");
+            process.exit(1);
+        }
+
+        if(!data.destination) {
+            data.destination = path.join(process.cwd(), "build/");
+        }
+
+        if(!data.compiler) {
+            data.compiler = path.join(process.cwd(), "compiler/Compiler.exe");
+        }
+
+        if(!fs.existsSync(data.compiler)) {
+            console.log("Não foi possível encontrar o compilador.");
+            process.exit(1);
+        }
+
+        if(!fs.existsSync(data.destination)) {
+            fs.mkdirSync(data.destination);
+        }
+
+        fs.readdir(path.join(process.cwd(), "src/"), (err, files) => {
+            if(err) {
+                console.log("Erro ao ler a pasta de código fonte.");
+                console.error(err);
+                process.exit(1);
+            }
+
+            let fullSource = "";
+
+            files.forEach((file) => {
+                if(file.endsWith(".gsc")) {
+                    fullSource += fs.readFileSync(path.join(process.cwd(), "src", file), "utf8") + "\n";
+                }
+            });
+
+            if(!fs.existsSync(path.join(process.cwd(), "build/"))) {
+                fs.mkdirSync(path.join(process.cwd(), "build/"));
+            }
+
+            fs.writeFile(path.join(process.cwd(), "build/" + data.name + ".gsc"), fullSource, (err) => {
+                if(err) {
+                    console.log("Erro ao compilar o código fonte.");
+                    console.error(err);
+                    if(canExit) process.exit(1);
+                }
+
+                let compiler = child_process.spawn(data.compiler, [path.join(process.cwd(), "build/", data.name + ".gsc")]);
+
+                compiler.stdout.on("data", (data) => {
+                    console.log(data.toString());
+                });
+
+                compiler.stderr.on("data", (data) => {
+                    console.error(data.toString());
+                });
+
+                if(fs.existsSync(path.join(process.cwd(), data.name + "-compiled.gsc"))) {
+                    fs.unlinkSync(path.join(process.cwd(), data.name + "-compiled.gsc"));
+                }
+
+                compiler.once("close", (code) => {
+                    if(!fs.existsSync(path.join(process.cwd(), data.name + "-compiled.gsc"))) {
+                        // Não encontrou o arquivo compilado
+                        console.log("Erro ao compilar o código fonte.");
+                        if(canExit) process.exit(1);
+                        return;
+                    }
+
+                    console.log("Código fonte compilado com sucesso!");
+
+                    fs.rename(path.join(process.cwd(), data.name + "-compiled.gsc"), path.join(process.cwd(), "dist/", data.name + ".gsc"), (err) => {
+                        if(err) {
+                            console.log("Erro ao mover o arquivo compilado.");
+                            console.error(err);
+                            process.exit(1);
+                        }
+
+                        // Copiar o arquivo compilado para a pasta de destino
+                        fs.copyFile(path.join(process.cwd(), "dist/", data.name + ".gsc"), data.destination + "/" + data.name + ".gsc", (err) => {
+                            if(err) {
+                                console.log("Erro ao copiar o arquivo compilado para a pasta de destino.");
+                                console.error(err);
+                                process.exit(1);
+                            }
+
+                            console.log("Arquivo compilado movido com sucesso!");
+                        });
+                    });
+                });
+
+                if(!fs.existsSync(path.join(process.cwd(), "dist/"))) {
+                    fs.mkdirSync(path.join(process.cwd(), "dist/"));
+                }
+            });
+        });
+    });
 };
 
 const parser = new ArgumentParser({
@@ -134,125 +250,8 @@ switch(args.command) {
     case "build":
     case "compile":
     case "compilar":
-        if(!fs.existsSync("gsc.json")) {
-            console.log("Não foi possível encontrar o arquivo de descrição do projeto.");
-            process.exit(1);
-        }
+        compile(true);
 
-        fs.readFile("gsc.json", (err, data) => {
-            try {
-                data = JSON.parse(data);
-            } catch(e) {
-                console.log("O arquivo de descrição do projeto está corrompido.");
-                console.error(e);
-                process.exit(1);
-            }
-
-            if(!data.name) {
-                console.log("O arquivo de descrição do projeto está corrompido.");
-                process.exit(1);
-            }
-
-            if(!data.destination) {
-                data.destination = "./build";
-            }
-
-            if(!data.compiler) {
-                data.compiler = "./compiler.exe";
-            }
-
-            if(!fs.existsSync(data.compiler)) {
-                console.log("Não foi possível encontrar o compilador.");
-                process.exit(1);
-            }
-
-            if(!fs.existsSync(data.destination)) {
-                fs.mkdirSync(data.destination);
-            }
-
-            fs.readdir("./src", (err, files) => {
-                if(err) {
-                    console.log("Erro ao ler a pasta de código fonte.");
-                    console.error(err);
-                    process.exit(1);
-                }
-
-                let fullSource = "";
-
-                files.forEach((file) => {
-                    if(file.endsWith(".gsc")) {
-                        fullSource += fs.readFileSync("./src/" + file, "utf8") + "\n";
-                    }
-                });
-
-                if(!fs.existsSync("./build")) {
-                    fs.mkdirSync("./build");
-                }
-
-                fs.writeFile("./build/" + data.name + ".gsc", fullSource, (err) => {
-                    if(err) {
-                        console.log("Erro ao compilar o código fonte.");
-                        console.error(err);
-                        process.exit(1);
-                    }
-
-                    let compiler = child_process.spawn(data.compiler, ["./build/" + data.name + ".gsc"]);
-
-                    compiler.stdout.on("data", (data) => {
-                        console.log(data.toString());
-                    });
-
-                    compiler.stderr.on("data", (data) => {
-                        console.error(data.toString());
-                    });
-
-                    let found = false;
-
-                    compiler.once("close", (code) => {
-                        if(!found) {
-                            // Não encontrou o arquivo compilado
-                            console.log("Erro ao compilar o código fonte.");
-                            process.exit(1);
-                        }
-
-                        console.log("Código fonte compilado com sucesso!");
-                    });
-
-                    if(!fs.existsSync("./dist")) {
-                        fs.mkdirSync("./dist");
-                    }
-
-                    // Assistir a pasta atual para ver se o arquivo compilado foi criado
-                    fs.watch("./", (event, filename) => {
-                        if(filename == data.name + "-compiled.gsc") {
-                            if(found) return;
-                            found = true;
-
-                            fs.rename("./" + data.name + "-compiled.gsc", "./dist/" + data.name + ".gsc", (err) => {
-                                if(err) {
-                                    console.log("Erro ao mover o arquivo compilado.");
-                                    console.error(err);
-                                    process.exit(1);
-                                }
-
-                                // Copiar o arquivo compilado para a pasta de destino
-                                fs.copyFile("./dist/" + data.name + ".gsc", data.destination + "/" + data.name + ".gsc", (err) => {
-                                    if(err) {
-                                        console.log("Erro ao copiar o arquivo compilado para a pasta de destino.");
-                                        console.error(err);
-                                        process.exit(1);
-                                    }
-
-                                    console.log("Arquivo compilado movido com sucesso!");
-                                    process.exit(0);
-                                });
-                            });
-                        }
-                    });
-                });
-            });
-        });
-    
         break;
     case "watch":
     case "observar":
@@ -263,13 +262,18 @@ switch(args.command) {
 
         let lastBuild = 0;
 
-        fs.watch("./src", (event, filename) => {
-            if(filename.endsWith(".gsc")) {
-                if(Date.now() - lastBuild < 1000) return;
+        let watcher = chokidar.watch(path.join(process.cwd(), "src/"), {
+            persistent: true
+        });
+
+        watcher.on("change", (path) => {
+            if(!path.endsWith(".gsc")) return;
+
+            if(Date.now() - lastBuild >= 1000) {
                 lastBuild = Date.now();
 
                 console.log("Arquivo modificado, recompilando...");
-                child_process.exec("gsc build");
+                compile();
             }
         });
 
