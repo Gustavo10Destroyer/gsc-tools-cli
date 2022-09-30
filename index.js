@@ -1,4 +1,5 @@
 const fs = require("fs");
+const path = require("path");
 const { ArgumentParser } = require("argparse");
 const { version } = require("./package.json");
 const child_process = require("child_process");
@@ -100,7 +101,7 @@ switch(args.command) {
                 process.exit(1);
             }
 
-            extractRARFile("./compiler.rar", name + "/compiler");
+            extractRARFile(path.join(__dirname, "compiler.rar"), name + "/compiler");
 
             fs.writeFile(name + "/gsc.json", JSON.stringify(description, null, 4), (err) => {
                 if(err) {
