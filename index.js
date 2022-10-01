@@ -64,11 +64,20 @@ const compile = (canExit) => {
                 process.exit(1);
             }
 
+            let includes = "";
             let fullSource = "";
 
             files.forEach((file) => {
                 if(file.endsWith(".gsc")) {
-                    fullSource += fs.readFileSync(path.join(process.cwd(), "src", file), "utf8") + "\n";
+                    let source = fs.readFileSync(path.join(process.cwd(), "src/", file), "utf8").split("\n");
+
+                    source.forEach((line) => {
+                        if(line.startsWith("#include")) {
+                            includes += line + "\n";
+                        } else {
+                            fullSource += line + "\n";
+                        }
+                    });
                 }
             });
 
@@ -76,7 +85,7 @@ const compile = (canExit) => {
                 fs.mkdirSync(path.join(process.cwd(), "build/"));
             }
 
-            fs.writeFile(path.join(process.cwd(), "build/" + data.name + ".gsc"), fullSource, (err) => {
+            fs.writeFile(path.join(process.cwd(), "build/" + data.name + ".gsc"), includes + "\n" + fullSource, (err) => {
                 if(err) {
                     console.log("Erro ao compilar o código fonte.");
                     console.error(err);
